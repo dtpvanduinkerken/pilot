@@ -40,9 +40,9 @@ h1, h2, h3 {
 </style>
 """, unsafe_allow_html=True)
 
-# ===== DATA INLADEN =====
+# ===== DATA INLADEN (STABIELE GOOGLE CONNECTIE) =====
 SHEET_ID = "1h3uj1r-BBGoI3h2qRbYj4Z8FucMqN_0sRX41ejx3aRs"
-url = f"https://opensheet.elk.sh/{SHEET_ID}/Sheet1"
+url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
 df = pd.read_csv(url)
 
@@ -55,11 +55,6 @@ def clean_column(df, col):
 
 df = clean_column(df, "Omzet")
 df = clean_column(df, "Gem. orde waarde")
-df = clean_column(df, "% loyalty")
-
-# fallback berekeningen
-if "Gem. orde waarde" not in df.columns and "Omzet" in df.columns and "Aantal verkooptransacties" in df.columns:
-    df["Gem. orde waarde"] = df["Omzet"] / df["Aantal verkooptransacties"]
 
 # ===== FILTERS =====
 col1, col2 = st.columns(2)
