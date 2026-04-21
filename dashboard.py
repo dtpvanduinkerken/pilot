@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import requests
 import plotly.express as px
 
 st.set_page_config(layout="wide")
@@ -38,26 +37,35 @@ h1, h2, h3 {
     font-size:28px;
     font-weight:700;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 # ===== DATA INLADEN =====
-SHEET_ID = "JOUW_SHEET_ID"
+SHEET_ID = "1h3uj1r-BBGoI3h2qRbYj4Z8FucMqN_0sRX41ejx3aRs"
 url = f"https://opensheet.elk.sh/{SHEET_ID}/Sheet1"
 
 df = pd.read_csv(url)
 
 # ===== DATA OPSCHONEN =====
-df["Omzet"] = df["Omzet"].replace('[€,]', '', regex=True).astype(float)
-df["Gem. orde waarde"] = df["Gem. orde waarde"].replace('[€,]', '', regex=True).astype(float)
-df["% loyalty"] = df["% loyalty"].replace('%', '', regex=True).astype(float)
+def clean_column(df, col):
+    if col in df.columns:
+        df[col] = df[col].astype(str).str.replace("€", "").str.replace(",", "").str.replace("%", "")
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+df = clean_column(df, "Omzet")
+df = clean_column(df, "Gem. orde waarde")
+df = clean_column(df, "% loyalty")
+
+# fallback berekeningen
+if "Gem. orde waarde" not in df.columns and "Omzet" in df.columns and "Aantal verkooptransacties" in df.columns:
+    df["Gem. orde waarde"] = df["Omzet"] / df["Aantal verkooptransacties"]
 
 # ===== FILTERS =====
 col1, col2 = st.columns(2)
 
-vereniging_filter = col1.selectbox("Selecteer vereniging", ["Alle"] + list(df["Vereniging"].unique()))
-sport_filter = col2.selectbox("Selecteer sport", ["Alle"] + list(df["Sport"].unique()))
+vereniging_filter = col1.selectbox("Vereniging", ["Alle"] + sorted(df["Vereniging"].dropna().unique()))
+sport_filter = col2.selectbox("Sport", ["Alle"] + sorted(df["Sport"].dropna().unique()))
 
 filtered_df = df.copy()
 
@@ -108,7 +116,7 @@ col4.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ===== TOP VERENIGINGEN =====
-st.markdown("### 🏆 Top verenigingen op omzet")
+st.markdown("### Top verenigingen op omzet")
 
 top_clubs = filtered_df.groupby("Vereniging")["Omzet"].sum().reset_index()
 top_clubs = top_clubs.sort_values(by="Omzet", ascending=False)
@@ -117,33 +125,33 @@ fig_top = px.bar(
     top_clubs,
     x="Omzet",
     y="Vereniging",
-    orientation="h",
+    orientation="h"
 )
 
 st.plotly_chart(fig_top, use_container_width=True)
 
 # ===== CONVERSIE PER CLUB =====
-st.markdown("### 📈 Conversie per vereniging")
+st.markdown("### Conversie per vereniging")
 
 filtered_df["Conversie %"] = (filtered_df["Aantal kopers"] / filtered_df["Aantal loyalty members"]) * 100
 
 fig_conv = px.bar(
     filtered_df,
     x="Vereniging",
-    y="Conversie %",
+    y="Conversie %"
 )
 
 st.plotly_chart(fig_conv, use_container_width=True)
 
 # ===== OMZET VS MEMBERS =====
-st.markdown("### 💡 Omzet vs Members")
+st.markdown("### Omzet vs Members")
 
 fig_scatter = px.scatter(
     filtered_df,
     x="Aantal loyalty members",
     y="Omzet",
     size="Aantal kopers",
-    hover_name="Vereniging",
+    hover_name="Vereniging"
 )
 
 st.plotly_chart(fig_scatter, use_container_width=True)
@@ -159,15 +167,15 @@ def score(row):
 
 filtered_df["Score"] = filtered_df.apply(score, axis=1)
 
-st.markdown("### 🚦 Club segmentatie")
+st.markdown("### Club segmentatie")
 
 fig_score = px.pie(filtered_df, names="Score")
 
 st.plotly_chart(fig_score, use_container_width=True)
 
-# ===== GROEI (ALS JE PERIODE HEBT) =====
+# ===== GROEI =====
 if "Periode" in df.columns:
-    st.markdown("### 📅 Groei loyalty members")
+    st.markdown("### Groei loyalty members")
 
     growth = df.groupby("Periode")["Aantal loyalty members"].sum().reset_index()
 
@@ -175,8 +183,8 @@ if "Periode" in df.columns:
 
     st.plotly_chart(fig_growth, use_container_width=True)
 
-# ===== CONCLUSIE BOX =====
-st.markdown("### 🧠 Conclusie")
+# ===== CONCLUSIE =====
+st.markdown("### Conclusie")
 
 best_club = top_clubs.iloc[0]["Vereniging"] if len(top_clubs) > 0 else "-"
 
@@ -185,6 +193,6 @@ Sterkste vereniging: {best_club}
 Totale conversie: {conversion:.1f}%  
 Gemiddelde orderwaarde: €{aov:.2f}
 
-➡️ Focus op verhogen van conversie bij lage clubs = grootste groeikans  
-➡️ Clubs met veel members maar lage omzet = quick wins  
+➡️ Grootste kans: verhoog conversie bij clubs met veel members  
+➡️ Focus: clubs met lage conversie maar hoge instroom  
 """)
